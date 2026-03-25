@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hesaplaşma Vakti</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hesaplaşma">
+
+<!-- iOS Ana Ekran İkonu (base64 SVG → PNG benzeri) -->
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --card: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #c8f135;
+    --accent2: #ff4d4d;
+    --text: #f0f0f0;
+    --muted: #666;
+    --positive: #c8f135;
+    --negative: #ff4d4d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: .5;
+  }
+
+  /* ══════════════════════════════
+     LOGIN SCREEN
+  ══════════════════════════════ */
+  #loginScreen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 48px;
+  }
+
+  .login-header {
+    text-align: center;
+  }
+
+  .login-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(56px, 12vw, 100px);
+    letter-spacing: 4px;
+    line-height: 1;
+    background: linear-gradient(135deg, var(--accent) 0%, #a8cc00 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .login-sub {
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  .users-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .user-card {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 20px;
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all .25s cubic-bezier(.34,1.56,.64,1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .user-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity .2s;
+    border-radius: inherit;
+  }
+
+  .user-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 16px 40px rgba(200,241,53,.15);
+  }
+
+  .user-card:hover::after { opacity: .04; }
+  .user-card:active { transform: scale(.97); }
+
+  .user-avatar {
+    font-size: 52px;
+    line-height: 1;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,.4));
+  }
+
+  .user-name {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  /* ══════════════════════════════
+     FIGURE PICKER
+  ══════════════════════════════ */
+  #figurePicker {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 32px;
+  }
+
+  .picker-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 40px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  .picker-sub { color: var(--muted); font-size: 14px; text-align: center; }
+
+  .figures-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    max-width: 420px;
+    width: 100%;
+  }
+
+  .figure-btn {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 10px;
+    font-size: 36px;
+    cursor: pointer;
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .figure-btn span.fig-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .figure-btn:hover {
+    border-color: var(--accent);
+    transform: scale(1.08);
+    box-shadow: 0 8px 24px rgba(200,241,53,.2);
+  }
+
+  .figure-btn.selected {
+    border-color: var(--accent);
+    background: rgba(200,241,53,.1);
+  }
+
+  /* Upload photo button */
+  .upload-photo-btn {
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 18px 24px;
+    cursor: pointer;
+    transition: all .2s cubic-bezier(.34,1.56,.64,1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 420px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .upload-photo-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,241,53,.05);
+    transform: scale(1.02);
+  }
+
+  .upload-photo-btn.selected {
+    border-color: var(--accent);
+    border-style: solid;
+    color: var(--accent);
+    background: rgba(200,241,53,.08);
+  }
+
+  .upload-photo-btn .upload-icon { font-size: 24px; }
+
+  .upload-preview {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+    display: none;
+  }
+
+  .picker-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 420px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .picker-divider::before, .picker-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Photo avatar in app */
+  .avatar-img {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(200,241,53,.3);
+    animation: floatAvatar 3s ease-in-out infinite;
+  }
+
+  .avatar-img-sm {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border);
+  }
+
+  .avatar-img-login {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(200,241,53,.3);
+  }
+
+  /* ══════════════════════════════
+     MAIN APP
+  ══════════════════════════════ */
+  #appScreen {
+    display: none;
+    min-height: 100vh;
+    flex-direction: column;
+    padding: 0 0 40px;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(13,13,13,.92);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+
+  .topbar-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--accent);
+  }
+
+  .logout-btn {
+    background: none;
+    border: 1.5px solid var(--border);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .logout-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Profile section */
+  .profile-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 36px 20px 28px;
+  }
+
+  .profile-avatar {
+    font-size: 72px;
+    filter: drop-shadow(0 8px 20px rgba(200,241,53,.3));
+    animation: floatAvatar 3s ease-in-out infinite;
+  }
+
+  @keyframes floatAvatar {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .profile-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+
+  .profile-balance-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .profile-total {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+  }
+
+  .total-positive { color: var(--positive); }
+  .total-negative { color: var(--negative); }
+  .total-zero { color: var(--muted); }
+
+  /* Debt card */
+  .debt-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+    gap: 20px;
+  }
+
+  .debt-nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .nav-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all .2s;
+  }
+
+  .nav-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: scale(1.1);
+  }
+
+  .debt-card {
+    flex: 1;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 24px;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all .3s ease;
+    min-width: 0;
+  }
+
+  .debt-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    opacity: .06;
+    transition: background .3s;
+  }
+
+  .debt-card.positive::before { background: var(--positive); }
+  .debt-card.negative::before { background: var(--negative); }
+
+  .debt-other-avatar { font-size: 56px; }
+  .debt-other-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px;
+    letter-spacing: 3px;
+  }
+
+  .debt-divider {
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+  }
+
+  .debt-amount {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 54px;
+    letter-spacing: 2px;
+    line-height: 1;
+    transition: color .3s;
+  }
+
+  .debt-amount.positive { color: var(--positive); }
+  .debt-amount.negative { color: var(--negative); }
+  .debt-amount.zero { color: var(--muted); }
+
+  .debt-label {
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .debt-label.positive { color: rgba(200,241,53,.7); }
+  .debt-label.negative { color: rgba(255,77,77,.7); }
+
+  /* Dots indicator */
+  .dots {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all .2s;
+  }
+
+  .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+  }
+
+  /* Action buttons */
+  .action-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+    margin-top: 8px;
+  }
+
+  .action-btn {
+    flex: 1;
+    padding: 14px 8px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .action-btn .ab-icon { font-size: 20px; }
+
+  .action-btn.add:hover {
+    border-color: var(--positive);
+    color: var(--positive);
+    background: rgba(200,241,53,.08);
+    transform: translateY(-2px);
+  }
+
+  .action-btn.sub:hover {
+    border-color: var(--negative);
+    color: var(--negative);
+    background: rgba(255,77,77,.08);
+    transform: translateY(-2px);
+  }
+
+  .action-btn.settle:hover {
+    border-color: #888;
+    color: #ccc;
+    background: rgba(255,255,255,.05);
+    transform: translateY(-2px);
+  }
+
+  /* Amount modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 0 0;
+  }
+
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 28px 28px 0 0;
+    padding: 28px 24px 40px;
+    width: 100%;
+    max-width: 480px;
+    animation: slideUp .3s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  @keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .modal-handle {
+    width: 40px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 20px;
+  }
+
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+
+  .modal-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  .amount-input-wrap {
+    position: relative;
+    margin-bottom: 20px;
+  }
+
+  .currency-symbol {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    color: var(--muted);
+  }
+
+  .amount-input {
+    width: 100%;
+    padding: 16px 16px 16px 44px;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 2px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  .amount-input:focus { border-color: var(--accent); }
+
+  .note-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    outline: none;
+    resize: none;
+    transition: border-color .2s;
+    margin-bottom: 20px;
+  }
+
+  .note-input:focus { border-color: var(--accent); }
+  .note-input::placeholder { color: var(--muted); }
+
+  .modal-actions { display: flex; gap: 12px; }
+
+  .modal-btn {
+    flex: 1;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .modal-btn.cancel {
+    background: none;
+    color: var(--muted);
+  }
+  .modal-btn.cancel:hover { border-color: #666; color: var(--text); }
+
+  .modal-btn.confirm {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+  }
+  .modal-btn.confirm:hover { background: #d4f54a; transform: scale(1.02); }
+
+  /* Notifications */
+  .notif-panel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    backdrop-filter: blur(8px);
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .notif-panel.open { display: flex; }
+
+  .notif-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 24px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+    animation: zoomIn .3s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  @keyframes zoomIn {
+    from { transform: scale(.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .notif-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .notif-icon { font-size: 32px; }
+
+  .notif-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+  }
+
+  .notif-sub { font-size: 12px; color: var(--muted); }
+
+  .notif-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+
+  .notif-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .notif-item-icon { font-size: 22px; flex-shrink: 0; }
+
+  .notif-item-body { flex: 1; }
+
+  .notif-item-text {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+
+  .notif-item-note { font-size: 11px; color: var(--muted); font-style: italic; }
+
+  .notif-item-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  .notif-close {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .notif-close:hover { background: #d4f54a; transform: scale(1.02); }
+
+  .notif-badge {
+    background: var(--negative);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+    position: absolute;
+    top: -4px; right: -4px;
+  }
+
+  .notif-trigger-btn {
+    position: relative;
+    background: none;
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+
+  .notif-trigger-btn:hover { border-color: var(--accent); transform: scale(1.05); }
+
+  /* History */
+  .history-section {
+    padding: 0 24px;
+    margin-top: 24px;
+    max-width: 448px;
+    width: 100%;
+    align-self: center;
+  }
+
+  .history-label {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .history-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .history-item-icon { font-size: 18px; flex-shrink: 0; }
+  .history-item-body { flex: 1; }
+  .history-item-desc { font-weight: 600; }
+  .history-item-note { font-size: 11px; color: var(--muted); font-style: italic; }
+  .history-item-time { font-size: 10px; color: var(--muted); }
+  .history-item-amount { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; }
+  .hist-pos { color: var(--positive); }
+  .hist-neg { color: var(--negative); }
+
+  /* Transitions */
+  .screen { transition: opacity .2s; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ════════ LOGIN SCREEN ════════ -->
+<div id="loginScreen" class="screen">
+  <div class="login-header">
+    <div class="login-title">HESAPLAŞMA<br>VAKTİ</div>
+  </div>
+  <div class="users-grid" id="usersGrid"></div>
+</div>
+
+<!-- ════════ FIGURE PICKER ════════ -->
+<div id="figurePicker" class="screen" style="display:none; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:40px 20px; gap:24px;">
+  <div style="width:100%;max-width:420px;display:flex;align-items:center;gap:12px;">
+    <button id="pickerBackBtn" onclick="cancelFigurePicker()" style="display:none;background:none;border:1.5px solid var(--border);color:var(--muted);border-radius:10px;padding:8px 14px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">← GERİ</button>
+    <div style="flex:1;text-align:center;">
+      <div class="picker-title">PROFİL FOTOĞRAFI</div>
+      <div class="picker-sub" id="pickerSub">Kendini temsil edecek bir figür seç</div>
+    </div>
+  </div>
+
+  <!-- Galeriden yükle butonu -->
+  <div style="width:100%;max-width:420px;">
+    <button class="upload-photo-btn" id="uploadPhotoBtn" onclick="document.getElementById('photoFileInput').click()">
+      <img class="upload-preview" id="uploadPreview" src="" alt="önizleme">
+      <span class="upload-icon">📷</span>
+      <span id="uploadBtnText">GALERİDEN FOTOĞRAF YÜKLE</span>
+    </button>
+    <input type="file" id="photoFileInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
+  </div>
+
+  <div class="picker-divider">veya figür seç</div>
+
+  <div class="figures-grid" id="figuresGrid"></div>
+  <button class="modal-btn confirm" style="max-width:300px; width:100%; padding:16px; font-size:15px;" onclick="confirmFigure()">DEVAM ET</button>
+</div>
+
+<!-- ════════ APP SCREEN ════════ -->
+<div id="appScreen" class="screen" style="display:none; flex-direction:column;">
+
+  <div class="topbar">
+    <div class="topbar-title">HESAPLAŞMA VAKTİ</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="notif-trigger-btn" id="notifBtn" onclick="openNotifications()">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
+      <button class="notif-trigger-btn" onclick="changeFigure()" title="Figürünü değiştir" style="font-size:16px;">🎭</button>
+      <button class="logout-btn" onclick="logout()">ÇIKIŞ</button>
+    </div>
+  </div>
+
+  <div class="profile-section">
+    <div class="profile-avatar" id="profileAvatar">🧑</div>
+    <div class="profile-name" id="profileName">AD</div>
+    <div class="profile-balance-label">TOPLAM BAKİYE</div>
+    <div class="profile-total" id="profileTotal">0 ₺</div>
+  </div>
+
+  <div class="debt-area">
+    <div class="debt-nav">
+      <button class="nav-btn" onclick="prevPerson()">‹</button>
+      <div class="debt-card" id="debtCard">
+        <div class="debt-other-avatar" id="debtAvatar">🧑</div>
+        <div class="debt-other-name" id="debtName">AD</div>
+        <div class="debt-divider"></div>
+        <div class="debt-amount zero" id="debtAmount">0 ₺</div>
+        <div class="debt-label" id="debtLabel">Borç yok</div>
+      </div>
+      <button class="nav-btn" onclick="nextPerson()">›</button>
+    </div>
+    <div class="dots" id="dots"></div>
+    <div class="action-row">
+      <button class="action-btn add" onclick="openModal('add')">
+        <span class="ab-icon">➕</span>
+        <span>ALACAK</span>
+        <span style="font-size:10px;color:var(--muted)">bana borçlu</span>
+      </button>
+      <button class="action-btn sub" onclick="openModal('sub')">
+        <span class="ab-icon">➖</span>
+        <span>BORÇ</span>
+        <span style="font-size:10px;color:var(--muted)">ona borçluyum</span>
+      </button>
+      <button class="action-btn settle" onclick="openModal('settle')">
+        <span class="ab-icon">✅</span>
+        <span>ÖDEME</span>
+        <span style="font-size:10px;color:var(--muted)">kapatalım</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="history-section" id="historySection">
+    <div class="history-label">SON HAREKETLERİ</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+</div>
+
+<!-- ════════ AMOUNT MODAL ════════ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitle">MİKTAR GİR</div>
+    <div class="modal-sub" id="modalSub"></div>
+    <div class="amount-input-wrap">
+      <span class="currency-symbol">₺</span>
+      <input type="number" class="amount-input" id="amountInput" placeholder="0" min="0">
+    </div>
+    <textarea class="note-input" id="noteInput" placeholder="Not ekle (isteğe bağlı)..." rows="2"></textarea>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="closeModal()">İPTAL</button>
+      <button class="modal-btn confirm" onclick="confirmAmount()">ONAYLA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ NOTIFICATIONS PANEL ════════ -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-box">
+    <div class="notif-header">
+      <span class="notif-icon">🔔</span>
+      <div>
+        <div class="notif-title">BİLDİRİMLER</div>
+        <div class="notif-sub" id="notifSubText">Yeni bildirim yok</div>
+      </div>
+    </div>
+    <div class="notif-list" id="notifList"></div>
+    <button class="notif-close" onclick="closeNotifications()">TAMAM</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+const FIGURES = [
+  { emoji: '🦁', label: 'Aslan' },
+  { emoji: '🐺', label: 'Kurt' },
+  { emoji: '🦊', label: 'Tilki' },
+  { emoji: '🐻', label: 'Ayı' },
+  { emoji: '🦅', label: 'Kartal' },
+  { emoji: '🐉', label: 'Ejder' },
+  { emoji: '🦋', label: 'Kelebek' },
+  { emoji: '🦈', label: 'Köpek Balığı' },
+  { emoji: '🐺', label: 'Bozkurt' },
+  { emoji: '🦊', label: 'Kızıl Tilki' },
+  { emoji: '🦝', label: 'Rakun' },
+  { emoji: '🐊', label: 'Timsah' },
+  { emoji: '🦁', label: 'Singa' },
+  { emoji: '🐯', label: 'Kaplan' },
+  { emoji: '🦂', label: 'Akrep' },
+  { emoji: '🦓', label: 'Zebra' },
+];
+
+// Unique figures
+const UNIQUE_FIGURES = [
+  { emoji: '🦁', label: 'Aslan' },
+  { emoji: '🐺', label: 'Kurt' },
+  { emoji: '🦊', label: 'Tilki' },
+  { emoji: '🐻', label: 'Ayı' },
+  { emoji: '🦅', label: 'Kartal' },
+  { emoji: '🐉', label: 'Ejder' },
+  { emoji: '🦋', label: 'Kelebek' },
+  { emoji: '🦈', label: 'Köpek balığı' },
+  { emoji: '🐯', label: 'Kaplan' },
+  { emoji: '🦂', label: 'Akrep' },
+  { emoji: '🦓', label: 'Zebra' },
+  { emoji: '🐊', label: 'Timsah' },
+];
+
+const USERS = ['Enes', 'Mert', 'Sabri', 'Göktürk'];
+
+// Load from localStorage or init
+function loadState() {
+  const saved = localStorage.getItem('borcDefteriState');
+  if (saved) return JSON.parse(saved);
+  
+  // Initial state: debts[A][B] means A owes B that amount (positive = A owes B)
+  const state = {
+    figures: {}, // user -> emoji
+    debts: {},   // debts[userA][userB] = amount (+ means userA owes userB, - means userB owes userA from A's perspective)
+    notifications: {}, // user -> [{...}]
+    history: [],  // global history
+  };
+
+  USERS.forEach(u => {
+    state.figures[u] = '';
+    state.debts[u] = {};
+    state.notifications[u] = [];
+    USERS.forEach(v => {
+      if (u !== v) state.debts[u][v] = 0;
+    });
+  });
+
+  return state;
+}
+
+function saveState() {
+  localStorage.setItem('borcDefteriState', JSON.stringify(appState));
+}
+
+let appState = loadState();
+let currentUser = null;
+let currentPersonIdx = 0;
+let pendingModalType = null; // 'add' | 'sub' | 'settle'
+let tempFigureUser = null;
+let selectedFigure = null;
+
+// ══════════════════════════════════════════════
+// GET OTHERS
+// ══════════════════════════════════════════════
+function getOthers() {
+  return USERS.filter(u => u !== currentUser);
+}
+
+function getCurrentOther() {
+  return getOthers()[currentPersonIdx];
+}
+
+// ══════════════════════════════════════════════
+// DEBT LOGIC
+// debts[A][B] = net amount. Positive = A is owed (B owes A). Negative = A owes B.
+// ══════════════════════════════════════════════
+function getDebt(userA, userB) {
+  // Returns how much userA should receive from userB (positive = userA receives, negative = userA pays)
+  return appState.debts[userA][userB] || 0;
+}
+
+function setDebt(userA, userB, amount) {
+  appState.debts[userA][userB] = amount;
+  appState.debts[userB][userA] = -amount;
+}
+
+// ══════════════════════════════════════════════
+// LOGIN SCREEN
+// ══════════════════════════════════════════════
+function renderLogin() {
+  const grid = document.getElementById('usersGrid');
+  grid.innerHTML = '';
+  USERS.forEach(u => {
+    const fig = appState.figures[u] || '';
+    const btn = document.createElement('div');
+    btn.className = 'user-card';
+    btn.innerHTML = `
+      <div class="user-avatar">${avatarHTML(fig, 'login')}</div>
+      <div class="user-name">${u}</div>
+    `;
+    btn.onclick = () => loginAs(u);
+    grid.appendChild(btn);
+  });
+}
+
+function loginAs(user) {
+  currentUser = user;
+  currentPersonIdx = 0;
+  
+  // Check if user has a figure
+  if (!appState.figures[user]) {
+    showFigurePicker(user);
+  } else {
+    showApp();
+  }
+}
+
+// ══════════════════════════════════════════════
+// FIGURE PICKER
+// ══════════════════════════════════════════════
+function showFigurePicker(user) {
+  tempFigureUser = user;
+  selectedFigure = null;
+  selectedFigureIsPhoto = false;
+  if (!figurePickerFromApp) figurePickerFromApp = false;
+  // Upload alanını sıfırla
+  const preview = document.getElementById('uploadPreview');
+  if (preview) { preview.style.display = 'none'; preview.src = ''; }
+  const uploadBtn = document.getElementById('uploadPhotoBtn');
+  if (uploadBtn) uploadBtn.classList.remove('selected');
+  const uploadText = document.getElementById('uploadBtnText');
+  if (uploadText) uploadText.textContent = 'GALERİDEN FOTOĞRAF YÜKLE';
+  const fileInput = document.getElementById('photoFileInput');
+  if (fileInput) fileInput.value = '';
+
+  document.getElementById('pickerSub').textContent = `${user}, kendini temsil edecek bir figür seç`;
+  // Geri butonunu sadece app içinden gelindiyse göster
+  document.getElementById('pickerBackBtn').style.display = figurePickerFromApp ? 'inline-block' : 'none';
+  const grid = document.getElementById('figuresGrid');
+  grid.innerHTML = '';
+  UNIQUE_FIGURES.forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = 'figure-btn';
+    btn.innerHTML = `${f.emoji}<span class="fig-label">${f.label}</span>`;
+    btn.onclick = () => {
+      document.querySelectorAll('.figure-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedFigure = f.emoji;
+      selectedFigureIsPhoto = false;
+      // Upload seçimini temizle
+      const preview = document.getElementById('uploadPreview');
+      if (preview) { preview.style.display = 'none'; }
+      const uploadBtn = document.getElementById('uploadPhotoBtn');
+      if (uploadBtn) uploadBtn.classList.remove('selected');
+      const uploadText = document.getElementById('uploadBtnText');
+      if (uploadText) uploadText.textContent = 'GALERİDEN FOTOĞRAF YÜKLE';
+    };
+    grid.appendChild(btn);
+  });
+  showScreen('figurePicker');
+}
+
+function confirmFigure() {
+  if (!selectedFigure) {
+    const grid = document.getElementById('figuresGrid');
+    grid.style.transform = 'translateX(-8px)';
+    setTimeout(() => grid.style.transform = 'translateX(8px)', 80);
+    setTimeout(() => grid.style.transform = '', 160);
+    return;
+  }
+  appState.figures[tempFigureUser] = selectedFigure;
+  saveState();
+  const fromApp = figurePickerFromApp;
+  figurePickerFromApp = false;
+  if (fromApp) {
+    showApp();
+  } else {
+    showApp();
+  }
+}
+
+function cancelFigurePicker() {
+  figurePickerFromApp = false;
+  showApp();
+}
+
+// ══════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════
+function showApp() {
+  renderApp();
+  showScreen('appScreen');
+  checkNotifications();
+}
+
+function renderApp() {
+  const fig = appState.figures[currentUser] || '';
+  document.getElementById('profileAvatar').innerHTML = avatarHTML(fig, 'profile');
+  document.getElementById('profileName').textContent = currentUser.toUpperCase();
+  
+  // Total balance
+  const others = getOthers();
+  let total = 0;
+  others.forEach(o => { total += getDebt(currentUser, o); });
+  const totalEl = document.getElementById('profileTotal');
+  totalEl.textContent = formatAmount(total);
+  totalEl.className = 'profile-total ' + (total > 0 ? 'total-positive' : total < 0 ? 'total-negative' : 'total-zero');
+
+  renderDebtCard();
+  renderDots();
+  renderHistory();
+}
+
+function renderDebtCard() {
+  const others = getOthers();
+  const other = others[currentPersonIdx];
+  const debt = getDebt(currentUser, other);
+  const fig = appState.figures[other] || '';
+
+  document.getElementById('debtAvatar').innerHTML = avatarHTML(fig, 'card');
+  document.getElementById('debtName').textContent = other.toUpperCase();
+
+  const amountEl = document.getElementById('debtAmount');
+  const labelEl = document.getElementById('debtLabel');
+  const card = document.getElementById('debtCard');
+
+  amountEl.textContent = formatAmount(debt);
+
+  if (debt > 0) {
+    amountEl.className = 'debt-amount positive';
+    labelEl.className = 'debt-label positive';
+    labelEl.textContent = `${other} sana ${Math.abs(debt).toLocaleString('tr-TR')} ₺ borçlu`;
+    card.className = 'debt-card positive';
+  } else if (debt < 0) {
+    amountEl.className = 'debt-amount negative';
+    labelEl.className = 'debt-label negative';
+    labelEl.textContent = `${other}'ya ${Math.abs(debt).toLocaleString('tr-TR')} ₺ borcun var`;
+    card.className = 'debt-card negative';
+  } else {
+    amountEl.className = 'debt-amount zero';
+    labelEl.className = 'debt-label';
+    labelEl.textContent = 'Aramızda hesap yok 🤝';
+    card.className = 'debt-card';
+  }
+}
+
+function renderDots() {
+  const dots = document.getElementById('dots');
+  const n = getOthers().length;
+  dots.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === currentPersonIdx ? ' active' : '');
+    dots.appendChild(d);
+  }
+}
+
+function renderHistory() {
+  const histSection = document.getElementById('historySection');
+  const histList = document.getElementById('historyList');
+  const other = getCurrentOther();
+  
+  // Filter history involving currentUser and currentOther
+  const relevant = appState.history.filter(h =>
+    (h.from === currentUser && h.to === other) ||
+    (h.from === other && h.to === currentUser)
+  ).slice(-5).reverse();
+
+  if (relevant.length === 0) {
+    histSection.style.display = 'none';
+    return;
+  }
+
+  histSection.style.display = 'block';
+  histList.innerHTML = '';
+  relevant.forEach(h => {
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    const isMe = h.from === currentUser;
+    const sign = h.type === 'add' ? '➕' : h.type === 'sub' ? '➖' : '✅';
+    const amtCls = h.type === 'settle' ? '' : (isMe ? (h.type === 'add' ? 'hist-pos' : 'hist-neg') : (h.type === 'add' ? 'hist-neg' : 'hist-pos'));
+    let desc = '';
+    if (h.type === 'add') desc = isMe ? `${other} sana borçlu` : `${other} alacaklı kaydetti`;
+    else if (h.type === 'sub') desc = isMe ? `${other}'ya borçlusun` : `${other} borç kaydetti`;
+    else desc = isMe ? 'Ödeme yaptın' : `${other} ödeme yaptı`;
+
+    item.innerHTML = `
+      <span class="history-item-icon">${sign}</span>
+      <div class="history-item-body">
+        <div class="history-item-desc">${desc}</div>
+        ${h.note ? `<div class="history-item-note">"${h.note}"</div>` : ''}
+        <div class="history-item-time">${h.time}</div>
+      </div>
+      <div class="history-item-amount ${amtCls}">${formatAmount(h.amount)}</div>
+    `;
+    histList.appendChild(item);
+  });
+}
+
+function prevPerson() {
+  const n = getOthers().length;
+  currentPersonIdx = (currentPersonIdx - 1 + n) % n;
+  animateCard('left');
+}
+
+function nextPerson() {
+  const n = getOthers().length;
+  currentPersonIdx = (currentPersonIdx + 1) % n;
+  animateCard('right');
+}
+
+function animateCard(dir) {
+  const card = document.getElementById('debtCard');
+  card.style.opacity = '0';
+  card.style.transform = `translateX(${dir === 'right' ? '-20px' : '20px'})`;
+  setTimeout(() => {
+    renderDebtCard();
+    renderDots();
+    renderHistory();
+    card.style.transition = 'all .25s cubic-bezier(.34,1.56,.64,1)';
+    card.style.opacity = '1';
+    card.style.transform = 'translateX(0)';
+    setTimeout(() => { card.style.transition = ''; card.style.transform = ''; }, 300);
+  }, 120);
+}
+
+// ══════════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════════
+function openModal(type) {
+  pendingModalType = type;
+  const other = getCurrentOther();
+  const titles = { add: `${other} sana borçlu`, sub: `${other}'ya borçlusun`, settle: 'Ödeme Yap' };
+  const subs = {
+    add: `${other}'ın sana olan borcunu artır (veya senin borcunu azalt)`,
+    sub: `${other}'ya olan borcunu kaydet`,
+    settle: `${other} ile aranızdaki borcu kapat`
+  };
+  document.getElementById('modalTitle').textContent = titles[type];
+  document.getElementById('modalSub').textContent = subs[type];
+  document.getElementById('amountInput').value = '';
+  document.getElementById('noteInput').value = '';
+  
+  if (type === 'settle') {
+    const debt = getDebt(currentUser, other);
+    document.getElementById('amountInput').value = Math.abs(debt) || '';
+  }
+  
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('amountInput').focus(), 200);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  pendingModalType = null;
+}
+
+function confirmAmount() {
+  const val = parseFloat(document.getElementById('amountInput').value);
+  const note = document.getElementById('noteInput').value.trim();
+  if (!val || val <= 0) {
+    const inp = document.getElementById('amountInput');
+    inp.style.borderColor = 'var(--negative)';
+    setTimeout(() => inp.style.borderColor = '', 600);
+    return;
+  }
+
+  const other = getCurrentOther();
+  let current = getDebt(currentUser, other);
+  let newDebt = current;
+  let histType = pendingModalType;
+
+  if (pendingModalType === 'add') {
+    newDebt = current + val; // currentUser is owed more
+  } else if (pendingModalType === 'sub') {
+    newDebt = current - val; // currentUser owes more
+  } else { // settle
+    // Pay toward balance
+    if (current < 0) {
+      newDebt = Math.min(0, current + val); // paying off what currentUser owes
+    } else {
+      newDebt = Math.max(0, current - val); // other is paying
+    }
+  }
+
+  setDebt(currentUser, other, newDebt);
+
+  // Record history
+  const now = new Date();
+  const timeStr = now.toLocaleString('tr-TR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  appState.history.push({
+    from: currentUser,
+    to: other,
+    type: histType,
+    amount: val,
+    note,
+    time: timeStr,
+  });
+
+  // Add notification for the other person
+  let notifMsg = '';
+  const myFig = appState.figures[currentUser] || '👤';
+  if (pendingModalType === 'add') {
+    notifMsg = `${myFig} ${currentUser}, seni ${val.toLocaleString('tr-TR')} ₺ borçlu olarak kaydetti.`;
+  } else if (pendingModalType === 'sub') {
+    notifMsg = `${myFig} ${currentUser}, ${val.toLocaleString('tr-TR')} ₺ sana borçlu olduğunu kaydetti.`;
+  } else {
+    notifMsg = `${myFig} ${currentUser}, ${val.toLocaleString('tr-TR')} ₺ ödeme kaydetti.`;
+  }
+
+  if (!appState.notifications[other]) appState.notifications[other] = [];
+  appState.notifications[other].push({
+    msg: notifMsg,
+    note,
+    time: timeStr,
+    read: false,
+  });
+
+  saveState();
+  closeModal();
+  renderApp();
+}
+
+// ══════════════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════════════
+function checkNotifications() {
+  const notifs = (appState.notifications[currentUser] || []).filter(n => !n.read);
+  const badge = document.getElementById('notifBadge');
+  if (notifs.length > 0) {
+    badge.style.display = 'flex';
+    badge.textContent = notifs.length;
+    // Auto open if new notifs
+    openNotifications();
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function openNotifications() {
+  const notifs = appState.notifications[currentUser] || [];
+  const list = document.getElementById('notifList');
+  list.innerHTML = '';
+
+  if (notifs.length === 0) {
+    document.getElementById('notifSubText').textContent = 'Yeni bildirim yok';
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:14px;">Tüm bildirimler okundu 🎉</div>';
+  } else {
+    document.getElementById('notifSubText').textContent = `${notifs.filter(n=>!n.read).length} okunmamış bildirim`;
+    [...notifs].reverse().forEach(n => {
+      const item = document.createElement('div');
+      item.className = 'notif-item';
+      item.innerHTML = `
+        <span class="notif-item-icon">${n.read ? '📩' : '🔴'}</span>
+        <div class="notif-item-body">
+          <div class="notif-item-text">${n.msg}</div>
+          ${n.note ? `<div class="notif-item-note">"${n.note}"</div>` : ''}
+          <div class="notif-item-time">${n.time}</div>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  document.getElementById('notifPanel').classList.add('open');
+}
+
+function closeNotifications() {
+  // Mark all as read
+  if (appState.notifications[currentUser]) {
+    appState.notifications[currentUser].forEach(n => n.read = true);
+    saveState();
+  }
+  document.getElementById('notifBadge').style.display = 'none';
+  document.getElementById('notifPanel').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function formatAmount(amount) {
+  const abs = Math.abs(amount).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  if (amount > 0) return `+${abs} ₺`;
+  if (amount < 0) return `-${abs} ₺`;
+  return '0 ₺';
+}
+
+function showScreen(id) {
+  ['loginScreen', 'figurePicker', 'appScreen'].forEach(s => {
+    const el = document.getElementById(s);
+    el.style.display = 'none';
+  });
+  const target = document.getElementById(id);
+  target.style.display = id === 'appScreen' ? 'flex' : (id === 'figurePicker' ? 'flex' : 'flex');
+  target.style.flexDirection = id === 'appScreen' ? 'column' : 'column';
+}
+
+function logout() {
+  currentUser = null;
+  currentPersonIdx = 0;
+  showScreen('loginScreen');
+  renderLogin();
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ══════════════════════════════════════════════
+// PHOTO UPLOAD & AVATAR HELPERS
+// ══════════════════════════════════════════════
+let figurePickerFromApp = false; // app içinden mi açıldı
+
+function changeFigure() {
+  figurePickerFromApp = true;
+  showFigurePicker(currentUser);
+}
+
+function handlePhotoUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Fotoğraf çok büyük! Lütfen 2MB\'dan küçük bir fotoğraf seç.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const base64 = e.target.result;
+    selectedFigure = base64;
+    selectedFigureIsPhoto = true;
+    const preview = document.getElementById('uploadPreview');
+    preview.src = base64;
+    preview.style.display = 'block';
+    document.getElementById('uploadBtnText').textContent = 'FOTOĞRAF SEÇİLDİ ✓';
+    document.getElementById('uploadPhotoBtn').classList.add('selected');
+    document.querySelectorAll('.figure-btn').forEach(b => b.classList.remove('selected'));
+  };
+  reader.readAsDataURL(file);
+}
+
+// Emoji mi, fotoğraf mı — doğru HTML üretir
+function avatarHTML(figureData, role) {
+  if (!figureData) return `<span style="font-size:${role==='profile'?'72px':role==='login'?'52px':'56px'}">👤</span>`;
+  if (figureData.startsWith('data:image')) {
+    const sizes = { profile: '80px', login: '56px', card: '56px' };
+    const sz = sizes[role] || '56px';
+    return `<img src="${figureData}" style="width:${sz};height:${sz};border-radius:50%;object-fit:cover;border:2px solid rgba(200,241,53,.35);${role==='profile'?'animation:floatAvatar 3s ease-in-out infinite;':''}" alt="avatar">`;
+  }
+  const sizes2 = { profile: '72px', login: '52px', card: '56px' };
+  return `<span style="font-size:${sizes2[role]||'40px'}">${figureData}</span>`;
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+renderLogin();
+showScreen('loginScreen');
+</script>
+</body>
+</html>
